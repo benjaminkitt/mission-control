@@ -5,16 +5,71 @@ import { logger } from "./logger";
 import { AgentRunner, parseClaudeOutput } from "./runner";
 import { HealthMonitor } from "./health";
 import { buildTaskPrompt, buildScheduledPrompt, getPendingTasks, isTaskUnblocked, hasPendingDecision } from "./prompt-builder";
-import type { DaemonConfig, MissionsFile } from "./types";
+import type { DaemonConfig, MissionsFile, Profile } from "./types";
 
 const DATA_DIR = path.resolve(__dirname, "../../data");
 const MISSIONS_FILE = path.join(DATA_DIR, "missions.json");
 const TASKS_FILE = path.join(DATA_DIR, "tasks.json");
 const ACTIVE_RUNS_FILE = path.join(DATA_DIR, "active-runs.json");
 const DECISIONS_FILE = path.join(DATA_DIR, "decisions.json");
+const CONFIG_FILE = path.join(DATA_DIR, "daemon-config.json");
+const AGENTS_FILE = path.join(DATA_DIR, "agents.json");
 const WORKSPACE_ROOT = path.resolve(__dirname, "../../..");
 const RETRY_QUEUE_FILE = path.join(DATA_DIR, "daemon-retry-queue.json");
 const MAX_RETRY_DELAY_MINUTES = 60;
+
+// ─── Profile Resolution ──────────────────────────────────────────────────────
+
+/**
+ * Get an agent definition by ID from agents.json
+ */
+function getAgent(agentId: string): { id: string; name: string; profileId?: string | null } | null {
+  try {
+    const raw = readFileSync(AGENTS_FILE, "utf-8");
+    const data = JSON.parse(raw) as { agents: Array<{ id: string; name: string; profileId?: string | null }> };
+    return data.agents.find((a) => a.id === agentId) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get a profile by ID from daemon-config.json
+ */
+function getProfile(profileId: string): Profile | null {
+  try {
+    const raw = readFileSync(CONFIG_FILE, "utf-8");
+    const config = JSON.parse(raw) as { profiles?: { definitions?: Profile[]; defaultProfileId?: string } };
+    const definitions = config.profiles?.definitions ?? [];
+    return definitions.find((p) => p.id === profileId) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve the profile for an agent and return its env vars.
+ * Falls back to default profile if agent has no profileId.
+ * Returns empty object if no profile found (preserves current behavior).
+ */
+function resolveProfileEnv(agentId: string): Record<string, string> {
+  const agent = getAgent(agentId);
+  if (!agent) {
+    logger.warn("dispatcher", `Agent ${agentId} not found, using empty profile env`);
+    return {};
+  }
+
+  const profileId = agent.profileId || "default";
+  const profile = getProfile(profileId);
+
+  if (!profile) {
+    logger.warn("dispatcher", `Profile ${profileId} not found for agent ${agentId}, using empty env`);
+    return {};
+  }
+
+  logger.info("dispatcher", `Using profile "${profile.name}" (${profile.id}) for agent ${agentId}`);
+  return profile.env || {};
+}
 
 // ─── Retry Queue ────────────────────────────────────────────────────────────
 
@@ -228,6 +283,9 @@ export class Dispatcher {
       // Start tracking the session
       const sessionId = this.health.startSession(agentId, taskId, "task", 0);
 
+      // Resolve profile and get env vars
+      const profileEnv = resolveProfileEnv(agentId);
+
       // Spawn the Claude Code process
       const spawnPromise = this.runner.spawnAgent({
         prompt,
@@ -235,6 +293,7 @@ export class Dispatcher {
         timeoutMinutes: this.config.execution.timeoutMinutes,
         skipPermissions: this.config.execution.skipPermissions,
         allowedTools: this.config.execution.allowedTools,
+        profileEnv,
         cwd: "", // Uses runner default (workspace root)
       });
 

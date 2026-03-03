@@ -117,6 +117,7 @@ export interface SpawnOptions {
   skipPermissions: boolean;
   allowedTools?: string[];
   agentTeams?: boolean;
+  profileEnv?: Record<string, string>;  // Profile environment variables to inject
   cwd: string;
   onSpawned?: (pid: number) => void;
 }

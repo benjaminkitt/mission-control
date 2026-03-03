@@ -111,7 +111,7 @@ export function validateBinary(binary: string): boolean {
  * SystemRoot/WINDIR/COMSPEC/PATHEXT (required for node.exe).
  * Strips all other env vars to prevent credential leakage.
  */
-export function buildSafeEnv(opts?: { agentTeams?: boolean }): Record<string, string> {
+export function buildSafeEnv(opts?: { agentTeams?: boolean; profileEnv?: Record<string, string> }): Record<string, string> {
   const safeEnv: Record<string, string> = {};
 
   // Preserve PATH for binary resolution
@@ -144,6 +144,13 @@ export function buildSafeEnv(opts?: { agentTeams?: boolean }): Record<string, st
   // Agent Teams: experimental multi-agent coordination
   if (opts?.agentTeams) {
     safeEnv.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1";
+  }
+
+  // Profile environment variables — merge on top to allow overrides
+  if (opts?.profileEnv) {
+    for (const [key, value] of Object.entries(opts.profileEnv)) {
+      safeEnv[key] = value;
+    }
   }
 
   return safeEnv;

@@ -247,7 +247,7 @@ export class AgentRunner {
       logger.info("runner", `Allowed tools: ${opts.allowedTools.join(", ")}`);
     }
 
-    const safeEnv = buildSafeEnv({ agentTeams: opts.agentTeams });
+    const safeEnv = buildSafeEnv({ agentTeams: opts.agentTeams, profileEnv: opts.profileEnv });
 
     logger.debug("runner", `Spawning: ${resolved.bin} ${resolved.prefixArgs.length ? resolved.prefixArgs[0] + " " : ""}-p "<prompt>" --max-turns ${opts.maxTurns}`);
     logger.debug("runner", `CWD: ${opts.cwd || this.cwd}`);
