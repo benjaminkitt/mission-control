@@ -64,6 +64,7 @@ Dashboard, inbox, decisions queue. See every agent's workload, read their report
 - **Brain Dump** — Capture ideas instantly, triage into tasks later
 - **Agent Crew** — 5 built-in agents + create unlimited custom agents with unique instructions
 - **Skills Library** — Define reusable knowledge modules and inject them into agent prompts
+- **Profiles** — Named configurations for Claude Code with custom environment variables per agent
 - **Multi-Agent Tasks** — Assign a lead agent + collaborators for team-based work
 - **Orchestrator** — Run `/orchestrate` to spawn all agents on pending work simultaneously
 - **Autonomous Daemon** — Background process that automatically polls tasks, spawns Claude Code sessions, enforces concurrency, and provides a real-time dashboard
@@ -214,6 +215,179 @@ POST /api/inbox/respond/stop
 ```
 
 All write endpoints use **Zod validation** (malformed data returns field-level errors) and **async-mutex locking** (concurrent writes from multiple agents queue safely, never corrupt data).
+
+---
+
+## Profiles
+
+Profiles are named configurations for Claude Code that let you customize environment variables per agent. Use profiles to:
+
+- Point different agents at different LLM providers (Anthropic, OpenAI-compatible, local)
+- Set custom API endpoints or model overrides
+- Configure provider-specific settings without duplicating agent definitions
+
+### Profile Structure
+
+Each profile has:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique identifier (e.g., `default`, `openai-compat`, `local-llm`) |
+| `name` | string | Display name |
+| `description` | string? | Optional description |
+| `env` | object | Environment variables to inject when spawning Claude Code |
+
+### Creating Profiles
+
+**Via API:**
+
+```bash
+# Create a new profile
+curl -X POST http://localhost:3000/api/profiles \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "openai-compat",
+    "name": "OpenAI Compatible",
+    "description": "Use an OpenAI-compatible API endpoint",
+    "env": {
+      "ANTHROPIC_BASE_URL": "https://api.example.com/v1",
+      "ANTHROPIC_API_KEY": "your-api-key"
+    }
+  }'
+
+# List all profiles
+curl http://localhost:3000/api/profiles
+
+# Update a profile
+curl -X PUT http://localhost:3000/api/profiles \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "openai-compat",
+    "name": "Custom Endpoint",
+    "env": { "ANTHROPIC_BASE_URL": "https://new-endpoint.example.com/v1" }
+  }'
+
+# Delete a profile (cannot delete default or profiles in use)
+curl -X DELETE "http://localhost:3000/api/profiles?id=openai-compat"
+```
+
+**Via daemon-config.json:**
+
+Edit `mission-control/data/daemon-config.json`:
+
+```json
+{
+  "profiles": {
+    "definitions": [
+      {
+        "id": "default",
+        "name": "Default",
+        "description": "Standard Claude Code behavior",
+        "env": {}
+      },
+      {
+        "id": "openai-compat",
+        "name": "OpenAI Compatible",
+        "description": "Use an OpenAI-compatible API endpoint",
+        "env": {
+          "ANTHROPIC_BASE_URL": "https://api.example.com/v1",
+          "ANTHROPIC_API_KEY": "your-api-key"
+        }
+      }
+    ],
+    "defaultProfileId": "default"
+  }
+}
+```
+
+### Assigning Profiles to Agents
+
+Edit `mission-control/data/agents.json` and add a `profileId` field:
+
+```json
+{
+  "agents": [
+    {
+      "id": "developer",
+      "name": "Developer",
+      "profileId": "openai-compat",
+      ...
+    }
+  ]
+}
+```
+
+Or use the API:
+
+```bash
+curl -X PUT http://localhost:3000/api/agents \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "developer",
+    "name": "Developer",
+    "profileId": "openai-compat",
+    ...
+  }'
+```
+
+### Profile Resolution Cascade
+
+When an agent is dispatched, Mission Control resolves the profile using this precedence:
+
+1. **Mission override** — If running as part of a continuous mission with a `profileId`, use that
+2. **Agent profileId** — Else if the agent has a `profileId` assigned, use that profile
+3. **System default** — Else use the profile specified by `defaultProfileId` (defaults to `default`)
+
+This allows you to:
+- Set a default profile for all agents
+- Override per-agent for specific use cases
+- Override per-mission for specific projects
+
+### Environment Variable Behavior
+
+Profile environment variables are merged with the safe execution environment:
+
+- Profile env vars are added to the base safe env (PATH, HOME, TEMP)
+- Profile vars do **not** override existing process environment variables (safety)
+- Use profiles for provider-specific settings (base URLs, API keys, model selection)
+
+### Example Profiles
+
+**Default Profile (empty env):**
+```json
+{
+  "id": "default",
+  "name": "Default",
+  "description": "Standard Claude Code behavior",
+  "env": {}
+}
+```
+
+**OpenAI-Compatible API Endpoint:**
+```json
+{
+  "id": "openai-compat",
+  "name": "OpenAI Compatible",
+  "description": "Route through an OpenAI-compatible API",
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://api.openai.com/v1",
+    "ANTHROPIC_API_KEY": "sk-..."
+  }
+}
+```
+
+**Local LLM Configuration:**
+```json
+{
+  "id": "local-llm",
+  "name": "Local LLM",
+  "description": "Use a local LLM server",
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://localhost:8080/v1",
+    "ANTHROPIC_API_KEY": "local-key"
+  }
+}
+```
 
 ---
 

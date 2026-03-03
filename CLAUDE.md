@@ -184,6 +184,64 @@ Tasks support a `collaborators` field alongside `assignedTo` (lead). When collab
 ### Skills Library
 Skills are managed through `mission-control/data/skills-library.json` and the `/skills` UI. Skills contain markdown content that gets injected into agent system prompts when linked. Skill files (`skills/<id>/SKILL.md`) are auto-generated from the library.
 
+### Profiles
+Profiles are named configurations for Claude Code that customize environment variables per agent. They're defined in `daemon-config.json` under `profiles.definitions`.
+
+**Profile Structure:**
+| Field | Type | Description |
+|-------|------|-------------|
+| id | string | Unique identifier (e.g., `default`, `openai-compat`) |
+| name | string | Display name |
+| description | string? | Optional description |
+| env | object | Environment variables to inject when spawning Claude Code |
+
+**Assigning Profiles to Agents:**
+Add a `profileId` field to the agent definition in `agents.json`:
+```json
+{
+  "id": "developer",
+  "name": "Developer",
+  "profileId": "openai-compat",
+  ...
+}
+```
+
+**Profile Resolution Cascade:**
+1. Mission override (if mission has a `profileId`)
+2. Agent `profileId` (if agent has one assigned)
+3. System default (`defaultProfileId` from config, defaults to `default`)
+
+**API Endpoints:**
+- `GET /api/profiles` — List all profiles
+- `POST /api/profiles` — Create a profile
+- `PUT /api/profiles` — Update a profile
+- `DELETE /api/profiles?id=...` — Delete a profile (cannot delete default or profiles in use)
+
+**Example Profiles:**
+```json
+// Default (empty env)
+{ "id": "default", "name": "Default", "env": {} }
+
+// OpenAI-compatible endpoint
+{
+  "id": "openai-compat",
+  "name": "OpenAI Compatible",
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://api.example.com/v1",
+    "ANTHROPIC_API_KEY": "your-key"
+  }
+}
+
+// Local LLM
+{
+  "id": "local-llm",
+  "name": "Local LLM",
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://localhost:8080/v1"
+  }
+}
+```
+
 ## Agent Write Strategy
 
 **Prefer API endpoints for writes.** The API routes include:
