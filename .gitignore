@@ -36,3 +36,7 @@ mission-control/data/checkpoints/*.json
 
 # Research & marketing files (local only, not pushed to GitHub)
 research/
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db
