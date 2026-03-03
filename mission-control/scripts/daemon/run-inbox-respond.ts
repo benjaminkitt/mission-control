@@ -55,6 +55,14 @@ interface AgentDef {
   capabilities: string[];
   skillIds: string[];
   status: string;
+  profileId?: string | null;
+}
+
+interface Profile {
+  id: string;
+  name: string;
+  description?: string;
+  env: Record<string, string>;
 }
 
 interface SkillDef {
@@ -86,6 +94,36 @@ function readJSON<T>(filename: string): T | null {
 function getAgent(agentId: string): AgentDef | null {
   const data = readJSON<{ agents: AgentDef[] }>("agents.json");
   return data?.agents.find((a) => a.id === agentId) ?? null;
+}
+
+function getProfile(profileId: string): Profile | null {
+  try {
+    const raw = readFileSync(path.join(DATA_DIR, "daemon-config.json"), "utf-8");
+    const config = JSON.parse(raw) as { profiles?: { definitions?: Profile[]; defaultProfileId?: string } };
+    const definitions = config.profiles?.definitions ?? [];
+    return definitions.find((p) => p.id === profileId) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveProfileEnv(agentId: string): Record<string, string> {
+  const agent = getAgent(agentId);
+  if (!agent) {
+    logger.warn("inbox-respond", `Agent ${agentId} not found, using empty profile env`);
+    return {};
+  }
+
+  const profileId = agent.profileId || "default";
+  const profile = getProfile(profileId);
+
+  if (!profile) {
+    logger.warn("inbox-respond", `Profile ${profileId} not found for agent ${agentId}, using empty env`);
+    return {};
+  }
+
+  logger.info("inbox-respond", `Using profile "${profile.name}" (${profile.id}) for agent ${agentId}`);
+  return profile.env || {};
 }
 
 function getLinkedSkills(agent: AgentDef): SkillDef[] {
@@ -488,6 +526,9 @@ async function main() {
     process.exit(1);
   }
 
+  // 2b. Resolve profile env for the agent
+  const profileEnv = resolveProfileEnv(agent.id);
+
   // 3. Load execution config
   const config = loadConfig();
   const { skipPermissions, allowedTools } = config.execution;
@@ -579,6 +620,7 @@ async function main() {
       timeoutMinutes: Math.min(config.execution.timeoutMinutes, timeoutPerSessionMinutes),
       skipPermissions,
       allowedTools,
+      profileEnv,
       cwd: WORKSPACE_ROOT,
       onSpawned: (pid) => {
         updateRespondRun(runId, { pid });
