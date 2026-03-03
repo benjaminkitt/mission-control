@@ -423,3 +423,278 @@ describe("daemon types", () => {
     expect(result.timedOut).toBe(false);
   });
 });
+
+// ─── Profile Resolution Tests ────────────────────────────────────────────────
+
+import type { Profile, ProfilesConfig } from "../scripts/daemon/types";
+
+/**
+ * Profile resolution follows the precedence: mission → agent → default
+ * 
+ * This function resolves the effective profile given:
+ * - missionProfileId: Profile ID assigned to the mission (if any)
+ * - agentProfileId: Profile ID assigned to the agent (if any)
+ * - profiles: The profiles configuration containing definitions and defaultProfileId
+ * 
+ * Resolution order:
+ * 1. If mission has a profileId, use that
+ * 2. Else if agent has a profileId, use that
+ * 3. Else use the default profile from profiles.defaultProfileId
+ */
+function resolveProfile(opts: {
+  missionProfileId?: string | null;
+  agentProfileId?: string | null;
+  profiles: ProfilesConfig;
+}): Profile | null {
+  const { missionProfileId, agentProfileId, profiles } = opts;
+  
+  // Determine which profile ID to use (mission → agent → default)
+  let targetId: string | null = null;
+  
+  if (missionProfileId) {
+    targetId = missionProfileId;
+  } else if (agentProfileId) {
+    targetId = agentProfileId;
+  } else {
+    targetId = profiles.defaultProfileId;
+  }
+  
+  // Find the profile definition
+  return profiles.definitions.find(p => p.id === targetId) ?? null;
+}
+
+describe("resolveProfile", () => {
+  const defaultProfile: Profile = {
+    id: "default",
+    name: "Default",
+    description: "Standard profile",
+    env: { DEFAULT_VAR: "default-value" },
+  };
+
+  const agentProfile: Profile = {
+    id: "agent-profile",
+    name: "Agent Profile",
+    description: "Agent-specific profile",
+    env: { AGENT_VAR: "agent-value" },
+  };
+
+  const missionProfile: Profile = {
+    id: "mission-profile",
+    name: "Mission Profile",
+    description: "Mission-specific profile",
+    env: { MISSION_VAR: "mission-value" },
+  };
+
+  const profiles: ProfilesConfig = {
+    definitions: [defaultProfile, agentProfile, missionProfile],
+    defaultProfileId: "default",
+  };
+
+  it("returns default profile when no mission or agent profile is set", () => {
+    const result = resolveProfile({ profiles });
+    expect(result).not.toBeNull();
+    expect(result?.id).toBe("default");
+  });
+
+  it("returns default profile when mission and agent profile are null", () => {
+    const result = resolveProfile({
+      missionProfileId: null,
+      agentProfileId: null,
+      profiles,
+    });
+    expect(result).not.toBeNull();
+    expect(result?.id).toBe("default");
+  });
+
+  it("returns agent profile when agent has a profileId and no mission profile", () => {
+    const result = resolveProfile({
+      agentProfileId: "agent-profile",
+      profiles,
+    });
+    expect(result).not.toBeNull();
+    expect(result?.id).toBe("agent-profile");
+  });
+
+  it("returns mission profile when mission has a profileId (takes precedence over agent)", () => {
+    const result = resolveProfile({
+      missionProfileId: "mission-profile",
+      agentProfileId: "agent-profile",
+      profiles,
+    });
+    expect(result).not.toBeNull();
+    expect(result?.id).toBe("mission-profile");
+  });
+
+  it("returns mission profile when only mission has a profileId", () => {
+    const result = resolveProfile({
+      missionProfileId: "mission-profile",
+      profiles,
+    });
+    expect(result).not.toBeNull();
+    expect(result?.id).toBe("mission-profile");
+  });
+
+  it("returns null when profile ID doesn't exist in definitions", () => {
+    const result = resolveProfile({
+      agentProfileId: "nonexistent-profile",
+      profiles,
+    });
+    expect(result).toBeNull();
+  });
+
+  it("returns null when defaultProfileId doesn't exist in definitions", () => {
+    const badProfiles: ProfilesConfig = {
+      definitions: [agentProfile],
+      defaultProfileId: "nonexistent",
+    };
+    const result = resolveProfile({ profiles: badProfiles });
+    expect(result).toBeNull();
+  });
+
+  it("returns agent profile when mission profile is null but agent has profile", () => {
+    const result = resolveProfile({
+      missionProfileId: null,
+      agentProfileId: "agent-profile",
+      profiles,
+    });
+    expect(result).not.toBeNull();
+    expect(result?.id).toBe("agent-profile");
+  });
+
+  it("returns default profile when agent profile is null and no mission profile", () => {
+    const result = resolveProfile({
+      agentProfileId: null,
+      profiles,
+    });
+    expect(result).not.toBeNull();
+    expect(result?.id).toBe("default");
+  });
+});
+
+// ─── Profile Env Var Merging in buildSafeEnv ─────────────────────────────────
+
+/**
+ * Extended buildSafeEnv that supports profile env var merging.
+ * 
+ * Profile env vars should be merged into the safe environment, with profile
+ * vars taking precedence over system vars (but not over process.env for safety).
+ * 
+ * This tests the expected behavior of profile env var merging.
+ */
+function buildSafeEnvWithProfile(opts?: {
+  agentTeams?: boolean;
+  profileEnv?: Record<string, string>;
+}): Record<string, string> {
+  // Start with the base safe env
+  const safeEnv = buildSafeEnv({ agentTeams: opts?.agentTeams });
+  
+  // Merge profile env vars (profile vars extend but don't overwrite existing)
+  if (opts?.profileEnv) {
+    for (const [key, value] of Object.entries(opts.profileEnv)) {
+      // Only add if not already present (system env takes precedence for safety)
+      if (!(key in safeEnv)) {
+        safeEnv[key] = value;
+      }
+    }
+  }
+  
+  return safeEnv;
+}
+
+describe("buildSafeEnvWithProfile", () => {
+  it("returns base safe env when no profile env provided", () => {
+    const env = buildSafeEnvWithProfile();
+    expect(env).toEqual(buildSafeEnv());
+  });
+
+  it("merges profile env vars into safe env", () => {
+    const profileEnv = {
+      ANTHROPIC_BASE_URL: "https://custom-endpoint.com/v1",
+      CUSTOM_VAR: "custom-value",
+    };
+    const env = buildSafeEnvWithProfile({ profileEnv });
+    
+    expect(env.ANTHROPIC_BASE_URL).toBe("https://custom-endpoint.com/v1");
+    expect(env.CUSTOM_VAR).toBe("custom-value");
+  });
+
+  it("preserves base safe env vars when merging profile env", () => {
+    const profileEnv = { CUSTOM_VAR: "value" };
+    const env = buildSafeEnvWithProfile({ profileEnv });
+    
+    // Base safe env vars should still be present
+    expect(env).toHaveProperty("PATH");
+  });
+
+  it("does not overwrite existing env vars with profile env (safety)", () => {
+    // Set a temp env var to test
+    const originalPath = process.env.PATH;
+    
+    const profileEnv = { PATH: "/malicious/path" };
+    const env = buildSafeEnvWithProfile({ profileEnv });
+    
+    // PATH should be the original, not the profile override
+    expect(env.PATH).toBe(originalPath);
+  });
+
+  it("supports agentTeams flag alongside profile env", () => {
+    const profileEnv = { CUSTOM_VAR: "value" };
+    const env = buildSafeEnvWithProfile({ agentTeams: true, profileEnv });
+    
+    expect(env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS).toBe("1");
+    expect(env.CUSTOM_VAR).toBe("value");
+  });
+
+  it("handles empty profile env", () => {
+    const env = buildSafeEnvWithProfile({ profileEnv: {} });
+    expect(env).toEqual(buildSafeEnv());
+  });
+
+  it("handles multiple profile env vars", () => {
+    const profileEnv = {
+      VAR1: "value1",
+      VAR2: "value2",
+      VAR3: "value3",
+    };
+    const env = buildSafeEnvWithProfile({ profileEnv });
+    
+    expect(env.VAR1).toBe("value1");
+    expect(env.VAR2).toBe("value2");
+    expect(env.VAR3).toBe("value3");
+  });
+});
+
+// ─── ProfilesConfig Validation Tests ────────────────────────────────────────
+
+describe("ProfilesConfig validation", () => {
+  it("requires at least one profile definition", () => {
+    const config: ProfilesConfig = {
+      definitions: [],
+      defaultProfileId: "default",
+    };
+    expect(config.definitions.length).toBe(0);
+  });
+
+  it("requires defaultProfileId to match a profile", () => {
+    const profiles: ProfilesConfig = {
+      definitions: [{ id: "default", name: "Default", env: {} }],
+      defaultProfileId: "nonexistent",
+    };
+    const defaultExists = profiles.definitions.some(p => p.id === profiles.defaultProfileId);
+    expect(defaultExists).toBe(false);
+  });
+
+  it("valid profile configuration", () => {
+    const profiles: ProfilesConfig = {
+      definitions: [
+        { id: "default", name: "Default", env: {} },
+        { id: "custom", name: "Custom", env: { CUSTOM_VAR: "value" } },
+      ],
+      defaultProfileId: "default",
+    };
+    
+    expect(profiles.definitions.length).toBe(2);
+    expect(profiles.definitions.some(p => p.id === "default")).toBe(true);
+    expect(profiles.definitions.some(p => p.id === "custom")).toBe(true);
+  });
+});

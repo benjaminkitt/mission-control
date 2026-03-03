@@ -17,6 +17,8 @@ import {
   brainDumpCreateSchema,
   brainDumpUpdateSchema,
   activityEventCreateSchema,
+  profileCreateSchema,
+  profileUpdateSchema,
   LIMITS,
 } from "@/lib/validations";
 
@@ -761,6 +763,227 @@ describe("activityEventCreateSchema", () => {
 
   it("rejects empty summary", () => {
     const result = activityEventCreateSchema.safeParse({ type: "task_created", summary: "" });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── Profile Create Schema ───────────────────────────────────────────────────
+
+describe("profileCreateSchema", () => {
+  it("accepts a valid profile with required fields", () => {
+    const result = profileCreateSchema.safeParse({
+      id: "default",
+      name: "Default",
+      env: {},
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.id).toBe("default");
+      expect(result.data.name).toBe("Default");
+      expect(result.data.env).toEqual({});
+    }
+  });
+
+  it("accepts a fully specified profile", () => {
+    const result = profileCreateSchema.safeParse({
+      id: "openai-compat",
+      name: "OpenAI Compatible",
+      description: "Use with OpenAI-compatible endpoints",
+      env: {
+        ANTHROPIC_BASE_URL: "https://api.openai.com/v1",
+        ANTHROPIC_API_KEY: "sk-test",
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.id).toBe("openai-compat");
+      expect(result.data.name).toBe("OpenAI Compatible");
+      expect(result.data.description).toBe("Use with OpenAI-compatible endpoints");
+      expect(result.data.env.ANTHROPIC_BASE_URL).toBe("https://api.openai.com/v1");
+    }
+  });
+
+  it("rejects missing id", () => {
+    const result = profileCreateSchema.safeParse({
+      name: "Test",
+      env: {},
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects empty id", () => {
+    const result = profileCreateSchema.safeParse({
+      id: "",
+      name: "Test",
+      env: {},
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects id with spaces", () => {
+    const result = profileCreateSchema.safeParse({
+      id: "test profile",
+      name: "Test",
+      env: {},
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects id with uppercase letters", () => {
+    const result = profileCreateSchema.safeParse({
+      id: "TestProfile",
+      name: "Test",
+      env: {},
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects id with special characters (except hyphens)", () => {
+    const result = profileCreateSchema.safeParse({
+      id: "test_profile!",
+      name: "Test",
+      env: {},
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts id with hyphens and numbers", () => {
+    const result = profileCreateSchema.safeParse({
+      id: "profile-123",
+      name: "Profile 123",
+      env: {},
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects missing name", () => {
+    const result = profileCreateSchema.safeParse({
+      id: "test",
+      env: {},
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects empty name", () => {
+    const result = profileCreateSchema.safeParse({
+      id: "test",
+      name: "",
+      env: {},
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects name exceeding max length", () => {
+    const result = profileCreateSchema.safeParse({
+      id: "test",
+      name: "x".repeat(LIMITS.TITLE + 1),
+      env: {},
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects missing env", () => {
+    const result = profileCreateSchema.safeParse({
+      id: "test",
+      name: "Test",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts empty env object", () => {
+    const result = profileCreateSchema.safeParse({
+      id: "test",
+      name: "Test",
+      env: {},
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts env with string values", () => {
+    const result = profileCreateSchema.safeParse({
+      id: "test",
+      name: "Test",
+      env: {
+        KEY1: "value1",
+        KEY2: "value2",
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects env with non-string values", () => {
+    const result = profileCreateSchema.safeParse({
+      id: "test",
+      name: "Test",
+      env: {
+        KEY1: 123,
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects description exceeding max length", () => {
+    const result = profileCreateSchema.safeParse({
+      id: "test",
+      name: "Test",
+      description: "x".repeat(LIMITS.DESCRIPTION + 1),
+      env: {},
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── Profile Update Schema ───────────────────────────────────────────────────
+
+describe("profileUpdateSchema", () => {
+  it("accepts a valid update with id and partial fields", () => {
+    const result = profileUpdateSchema.safeParse({
+      id: "default",
+      name: "Updated Name",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.id).toBe("default");
+      expect(result.data.name).toBe("Updated Name");
+    }
+  });
+
+  it("accepts update with only id", () => {
+    const result = profileUpdateSchema.safeParse({ id: "default" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts updating env", () => {
+    const result = profileUpdateSchema.safeParse({
+      id: "default",
+      env: { NEW_VAR: "value" },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts setting description to null", () => {
+    const result = profileUpdateSchema.safeParse({
+      id: "default",
+      description: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects missing id", () => {
+    const result = profileUpdateSchema.safeParse({ name: "Updated" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects empty id", () => {
+    const result = profileUpdateSchema.safeParse({ id: "" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects name exceeding max length", () => {
+    const result = profileUpdateSchema.safeParse({
+      id: "test",
+      name: "x".repeat(LIMITS.TITLE + 1),
+    });
     expect(result.success).toBe(false);
   });
 });
