@@ -272,6 +272,7 @@ export const agentCreateSchema = z.object({
   capabilities: z.array(z.string().max(100)).max(50).optional().default([]),
   skillIds: z.array(z.string().max(100)).max(50).optional().default([]),
   status: agentStatusEnum.optional().default("active"),
+  profileId: z.string().max(50).nullable().optional().default(null),
 });
 
 export const agentUpdateSchema = z.object({
@@ -283,6 +284,7 @@ export const agentUpdateSchema = z.object({
   capabilities: z.array(z.string().max(100)).max(50).optional(),
   skillIds: z.array(z.string().max(100)).max(50).optional(),
   status: agentStatusEnum.optional(),
+  profileId: z.string().max(50).nullable().optional(),
 });
 
 // ─── Skill schemas ──────────────────────────────────────────────────────────

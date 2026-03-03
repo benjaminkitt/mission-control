@@ -31,6 +31,7 @@ export interface AgentDefinition {
   capabilities: string[];
   skillIds: string[];
   status: AgentStatus;
+  profileId?: string | null;  // Assigned profile (null = use system default)
   createdAt: string;
   updatedAt: string;
 }

@@ -60,6 +60,7 @@ export async function POST(request: Request) {
       capabilities: body.capabilities,
       skillIds: body.skillIds,
       status: body.status,
+      profileId: body.profileId ?? null,
       createdAt: now,
       updatedAt: now,
     };

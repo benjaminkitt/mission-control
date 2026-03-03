@@ -19,6 +19,7 @@ interface AgentDef {
   capabilities: string[];
   skillIds: string[];
   status: string;
+  profileId?: string | null;  // Assigned profile (null = use system default)
 }
 
 interface SkillDef {
