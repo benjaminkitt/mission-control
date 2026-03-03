@@ -47,5 +47,16 @@
     "maxContinuations": 2,
     "maxTurnsPerSession": 25,
     "timeoutPerSessionMinutes": 15
+  },
+  "profiles": {
+    "definitions": [
+      {
+        "id": "default",
+        "name": "Default",
+        "description": "Standard Claude Code behavior",
+        "env": {}
+      }
+    ],
+    "defaultProfileId": "default"
   }
 }
