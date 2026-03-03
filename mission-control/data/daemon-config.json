@@ -55,6 +55,51 @@
         "name": "Default",
         "description": "Standard Claude Code behavior",
         "env": {}
+      },
+      {
+        "id": "opus",
+        "name": "Claude Opus 4.6",
+        "description": "Researcher & Business Analyst profile - Opus model",
+        "env": {
+          "ANTHROPIC_MODEL": "claude-opus-4-6",
+          "ANTHROPIC_BASE_URL": "http://127.0.0.1:8317"
+        }
+      },
+      {
+        "id": "sonnet",
+        "name": "Claude Sonnet",
+        "description": "General purpose Sonnet model profile",
+        "env": {
+          "ANTHROPIC_MODEL": "claude-sonnet-4-5-20250929",
+          "ANTHROPIC_BASE_URL": "http://127.0.0.1:8317"
+        }
+      },
+      {
+        "id": "developer",
+        "name": "Developer (GLM-5)",
+        "description": "Developer agent profile - GLM-5 model",
+        "env": {
+          "ANTHROPIC_MODEL": "glm-5",
+          "ANTHROPIC_BASE_URL": "http://127.0.0.1:8317"
+        }
+      },
+      {
+        "id": "tester",
+        "name": "Tester (Kimi K2.5)",
+        "description": "Tester agent profile - Kimi K2.5 model",
+        "env": {
+          "ANTHROPIC_MODEL": "kimi-k2.5",
+          "ANTHROPIC_BASE_URL": "http://127.0.0.1:8317"
+        }
+      },
+      {
+        "id": "haiku",
+        "name": "Haiku (Qwen 3.5 Plus)",
+        "description": "Haiku model profile - Qwen 3.5 Plus",
+        "env": {
+          "ANTHROPIC_MODEL": "qwen3.5-plus",
+          "ANTHROPIC_BASE_URL": "http://127.0.0.1:8317"
+        }
       }
     ],
     "defaultProfileId": "default"

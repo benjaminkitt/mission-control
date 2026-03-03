@@ -34,6 +34,7 @@
         "skill_demo_research"
       ],
       "status": "active",
+      "profileId": "opus",
       "createdAt": "2026-01-24T22:17:49.775Z",
       "updatedAt": "2026-01-24T22:17:49.775Z"
     },
@@ -55,6 +56,7 @@
         "skill_demo_task_mgmt"
       ],
       "status": "active",
+      "profileId": "developer",
       "createdAt": "2026-01-24T22:17:49.775Z",
       "updatedAt": "2026-01-24T22:17:49.775Z"
     },
@@ -94,6 +96,7 @@
         "skill_demo_eisenhower"
       ],
       "status": "active",
+      "profileId": "opus",
       "createdAt": "2026-01-24T22:17:49.775Z",
       "updatedAt": "2026-01-24T22:17:49.775Z"
     },
@@ -114,6 +117,7 @@
       ],
       "skillIds": [],
       "status": "active",
+      "profileId": "tester",
       "createdAt": "2026-02-28T20:50:21.322Z",
       "updatedAt": "2026-02-28T20:50:21.322Z"
     }
