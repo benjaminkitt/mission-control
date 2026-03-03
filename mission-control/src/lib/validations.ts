@@ -305,6 +305,24 @@ export const skillUpdateSchema = z.object({
   tags: z.array(z.string().max(LIMITS.TAG)).max(LIMITS.MAX_TAGS).optional(),
 });
 
+// ─── Profile schemas ──────────────────────────────────────────────────────────
+
+const profileSchema = z.object({
+  id: z.string().min(1, "Profile ID is required").max(50).regex(/^[a-z0-9-]+$/, "Profile ID must be lowercase alphanumeric with hyphens"),
+  name: z.string().min(1, "Name is required").max(LIMITS.TITLE),
+  description: z.string().max(LIMITS.DESCRIPTION).optional(),
+  env: z.record(z.string(), z.string()),
+});
+
+export const profileCreateSchema = profileSchema;
+
+export const profileUpdateSchema = z.object({
+  id: z.string().min(1, "Profile ID is required"),
+  name: z.string().min(1).max(LIMITS.TITLE).optional(),
+  description: z.string().max(LIMITS.DESCRIPTION).nullable().optional(),
+  env: z.record(z.string(), z.string()).optional(),
+});
+
 // ─── Daemon Config schemas ─────────────────────────────────────────────────────
 
 const scheduleEntrySchema = z.object({
@@ -343,6 +361,10 @@ export const daemonConfigUpdateSchema = z.object({
     maxContinuations: z.number().int().min(0).max(5),
     maxTurnsPerSession: z.number().int().min(5).max(100),
     timeoutPerSessionMinutes: z.number().int().min(5).max(60),
+  }).optional(),
+  profiles: z.object({
+    definitions: z.array(profileSchema).min(1, "At least one profile is required"),
+    defaultProfileId: z.string().min(1, "Default profile ID is required"),
   }).optional(),
 }).strict();
 

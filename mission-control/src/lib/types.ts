@@ -56,6 +56,20 @@ export interface SkillsLibraryFile {
   skills: SkillDefinition[];
 }
 
+// ─── Claude Code Profiles ──────────────────────────────────────────────────────
+
+export interface Profile {
+  id: string;           // unique identifier (e.g., 'default', 'openai-compat', 'local-llm')
+  name: string;         // display name
+  description?: string; // optional description
+  env: Record<string, string>; // environment variables to set when spawning Claude Code
+}
+
+export interface ProfilesConfig {
+  definitions: Profile[];
+  defaultProfileId: string; // defaults to 'default'
+}
+
 // ─── AI Skills (slash commands) ───────────────────────────────────────────────
 
 export interface SkillInfo {

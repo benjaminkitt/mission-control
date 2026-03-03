@@ -38,6 +38,17 @@ const DEFAULT_CONFIG: DaemonConfig = {
     maxTurnsPerSession: 25,
     timeoutPerSessionMinutes: 15,
   },
+  profiles: {
+    definitions: [
+      {
+        id: "default",
+        name: "Default",
+        description: "Standard Claude Code behavior",
+        env: {},
+      },
+    ],
+    defaultProfileId: "default",
+  },
 };
 
 // ─── Validation ──────────────────────────────────────────────────────────────
@@ -128,6 +139,30 @@ function validateConfig(config: unknown): DaemonConfig {
     }
     if (typeof inbox.timeoutPerSessionMinutes === "number" && inbox.timeoutPerSessionMinutes >= 5 && inbox.timeoutPerSessionMinutes <= 60) {
       result.inbox.timeoutPerSessionMinutes = inbox.timeoutPerSessionMinutes;
+    }
+  }
+
+  // Merge profiles
+  if (c.profiles && typeof c.profiles === "object") {
+    const profiles = c.profiles as Record<string, unknown>;
+    if (Array.isArray(profiles.definitions)) {
+      const validProfiles = profiles.definitions.filter((p): p is Record<string, unknown> =>
+        typeof p === "object" && p !== null &&
+        typeof p.id === "string" && p.id.length > 0 &&
+        typeof p.name === "string" && p.name.length > 0 &&
+        typeof p.env === "object" && p.env !== null
+      );
+      if (validProfiles.length > 0) {
+        result.profiles.definitions = validProfiles.map(p => ({
+          id: p.id,
+          name: p.name,
+          description: typeof p.description === "string" ? p.description : undefined,
+          env: p.env as Record<string, string>,
+        }));
+      }
+    }
+    if (typeof profiles.defaultProfileId === "string" && profiles.defaultProfileId.length > 0) {
+      result.profiles.defaultProfileId = profiles.defaultProfileId;
     }
   }
 
